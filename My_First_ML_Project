@@ -1,0 +1,102 @@
+setwd("~/FINAL_LAB") # set working directory
+
+library('RODBC')
+# connecting database
+ch <- odbcConnect("hmdalab",uid="gpadmin",
+                  case="postgresql",pwd="changeme") 
+
+
+#getting data
+full_data<-sqlQuery(ch,"select * from team1_final_table;" )
+
+ 
+
+full_data1 <- subset(full_data,full_data$action_type_pred == 1)
+
+full_data2<-subset(full_data,full_data$action_type_pred == 0)
+
+Samp5000app <- sample(c(1:nrow(full_data1)),size=5000,replace=F)
+Samp5000dec <- sample(c(1:nrow(full_data2)),size=5000,replace=F)
+
+CT_SA <-full_data1[Samp5000app,]
+CT_SD <-full_data2[Samp5000dec,]
+
+CTTestA <-full_data1[-Samp5000app,]
+CTTestB <-full_data2[-Samp5000dec,]
+
+
+CTTrain <- rbind(CT_SA,CT_SD)
+CTTest <- rbind(CTTestA,CTTestB)
+
+#full_data<-subset(mydata, select = -c(edit_status) )
+
+#indexing to split data into train and set
+#index = sample(1:nrow(full_data), size=0.9*nrow(full_data))
+ 
+
+#train dataset
+#trainingset<-full_data[index,]
+
+# test dataset
+#testingset<-full_data[-index,]
+
+#regression model
+model<-glm(action_type_pred ~loan_type + loan_amount + preapproval + lien_status + applicant_income + applicant_sex + loan_purpose  ,CTTrain ,family=binomial(link="logit"))
+
+summary(model)
+
+#predict on train
+res<- predict(model,CTTrain,type="response")
+
+#confussion Matrix - overall accuracy rate
+(table(Actualvalue=CTTrain$action_type_pred,Predictvalue=res>0.5))
+(2770+3392)/(1608+2230+2770+3392)
+#0.6162
+
+
+library(bitops)
+library(ROCR)
+
+ROCRPred<-prediction (res,CTTrain$action_type_pred)
+
+ROCPerf<-performance(ROCRPred,"tpr","fpr")
+
+aucObj1 = performance(ROCRPred, measure="auc")
+
+auc1 = aucObj1@y.values[[1]]
+auc1
+
+plot(ROCPerf,colorize=TRUE,main=paste("Area under the curve:",auc1),print.cutoffs.at=seq(0.1,by=0.1))
+
+
+
+res1<- predict(model,CTTest,type="response")
+
+#confussion Matrix
+(table(Actualvalue=CTTest$action_type_pred,Predictvalue=res1>0.5))
+(11837+66185)/(11837+9945+31277+66185)
+#0.654
+
+
+library(bitops)
+library(ROCR)
+
+ROCRPred1<-prediction (res1,CTTest$action_type_pred)
+
+ROCPerf1<-performance(ROCRPred1,"tpr","fpr")
+
+aucObj2= performance(ROCRPred1, measure="auc")
+
+auc2 = aucObj2@y.values[[1]]
+auc2
+
+plot(ROCPerf1,colorize=TRUE,main=paste("Area under the curve:",auc2),print.cutoffs.at=seq(0.1,by=0.1))
+
+
+
+
+
+###########################################
+
+
+ 
